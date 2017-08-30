@@ -26,10 +26,10 @@ def plotTriggerEfficiency( inFileSample, sample, triggerDenom, name, cut, xmin, 
 	outputFileName = name+'_'+cut+'_'+triggerDenom+"_"+args.trigger+'_'+sample+'_'+'_TriggerEfficiency'+args.version+'.'+args.extension
 	print 'Processing.......', outputFileName
 
-	DenomOnly = inFileSample.Get( 'PFHT'+cut+'TriggerEfficiency/'+name+'Denom' ) #+cut ) 
+	DenomOnly = inFileSample.Get( args.trigger+'TriggerEfficiency/'+name+'Denom'+cut ) 
 	DenomOnly.Rebin(rebin)
 	Denom = DenomOnly.Clone()
-	PassingOnly = inFileSample.Get( 'PFHT'+cut+'TriggerEfficiency/'+name+'Passing' ) #+cut ) 
+	PassingOnly = inFileSample.Get( args.trigger+'TriggerEfficiency/'+name+'Passing'+cut ) 
 	PassingOnly.Rebin(rebin)
 	Passing = PassingOnly.Clone()
 	print Denom, Passing
@@ -205,31 +205,50 @@ def plotDiffEff( listOfEff, name ):
 	can.SaveAs( 'Plots/'+name+'_DiffEfficiencies.'+args.extension )
 	del can
 
+###### Rebin 2D plots
+def Rebin2D( h1, rebinx, rebiny ):
+	"""docstring for Rebin2D"""
 
-def plot2DTriggerEfficiency( inFileSample, dataset, triggerSel, triggerDenom, name, cut, xlabel, ylabel, Xmin, Xmax, rebinx, Ymin, Ymax, rebiny, labX, labY, PU ):
+	tmph1 = h1.Clone()
+	nbinsx = h1.GetXaxis().GetNbins()
+	nbinsy = h1.GetYaxis().GetNbins()
+	xmin  = h1.GetXaxis().GetXmin()
+	xmax  = h1.GetXaxis().GetXmax()
+	ymin  = h1.GetYaxis().GetXmin()
+	ymax  = h1.GetYaxis().GetXmax()
+	nx = nbinsx/rebinx
+	ny = nbinsy/rebiny
+	h1.SetBins( nx, xmin, xmax, ny, ymin, ymax )
+
+	for biny in range( 1, nbinsy):
+		for binx in range(1, nbinsx):
+			ibin1 = h1.GetBin(binx,biny)
+			h1.SetBinContent( ibin1, 0 )
+		
+	for biny in range( 1, nbinsy):
+		by = tmph1.GetYaxis().GetBinCenter( biny )
+		iy = h1.GetYaxis().FindBin(by)
+		for binx in range(1, nbinsx):
+			bx = tmph1.GetXaxis().GetBinCenter(binx)
+			ix  = h1.GetXaxis().FindBin(bx)
+			bin = tmph1.GetBin(binx,biny)
+			ibin= h1.GetBin(ix,iy)
+			cu  = tmph1.GetBinContent(bin)
+			h1.AddBinContent(ibin,cu)
+	return h1
+
+
+def plot2DTriggerEfficiency( inFileSample, dataset, triggerDenom, name, xlabel, ylabel, Xmin, Xmax, rebinx, Ymin, Ymax, rebiny, labX, labY ):
 	"""docstring for plot"""
 
-	outputFileName = name+'_'+cut+'_'+triggerDenom+"_"+triggerSel+'_'+dataset+'_'+'TriggerEfficiency'+args.version+'.'+args.extension
+	outputFileName = name+'_'+args.cut+'_'+triggerDenom+"_"+args.trigger+'_'+dataset+'_'+'TriggerEfficiency'+args.version+'.'+args.extension
 	print 'Processing.......', outputFileName
 
-	print 'TriggerEfficiency'+triggerSel+'/'+name+'Denom_'+cut
-	rawDenom = inFileSample.Get( 'TriggerEfficiency'+triggerSel+'/'+name+'Denom_'+cut )
-	#profileDenom = rawDenom.ProfileX( name+'Denom_'+cut+'_pfy', 50, -1, 'o')
-	#newDenom = TH1F( 'newDenom', 'newDenom', profileDenom.GetXaxis().GetNbins(), profileDenom.GetXaxis().GetBinLowEdge(1), profileDenom.GetXaxis().GetBinLowEdge(profileDenom.GetMaximumBin()+1) )
-	#for i in range(1,profileDenom.GetXaxis().GetNbins()):
-	#	print newDenom
-	#	newDenom.SetBinContent( i, profileDenom.GetBinContent(i) )
-	#	newDenom.SetBinError( i, profileDenom.GetBinError(i) )
-	#newDenom.Rebin( rebinx )
+	print args.trigger+'TriggerEfficiency/'+name+'Denom'+args.cut
+	rawDenom = inFileSample.Get( args.trigger+'TriggerEfficiency/'+name+'Denom'+args.cut )
 	Denom = Rebin2D( rawDenom, rebinx, rebiny )
 
-	rawPassing = inFileSample.Get( 'TriggerEfficiency'+triggerSel+'/'+name+'Passing_'+cut )
-	#profilePassing = rawPassing.ProfileX( name+'Passing_'+cut+'_pfy', 50, -1, 'o')
-	#newPassing = TH1F( 'newPassing', 'newPassing', profilePassing.GetXaxis().GetNbins(), profilePassing.GetXaxis().GetBinLowEdge(1), profilePassing.GetXaxis().GetBinLowEdge(profilePassing.GetMaximumBin()+1) )
-	#for j in range(1,profilePassing.GetXaxis().GetNbins()):
-	#	newPassing.SetBinContent( j, profilePassing.GetBinContent(j) )
-	#	newPassing.SetBinError( j, profilePassing.GetBinError(j) )
-	#newPassing.Rebin( rebinx )
+	rawPassing = inFileSample.Get( args.trigger+'TriggerEfficiency/'+name+'Passing'+args.cut )
 	Passing = Rebin2D( rawPassing, rebinx, rebiny )
 
 	
@@ -244,15 +263,6 @@ def plot2DTriggerEfficiency( inFileSample, dataset, triggerSel, triggerDenom, na
 	Efficiency.Reset()
 	Efficiency.Divide( Passing, Denom, 1, 1, 'B' )
 
-	'''
-	for i in range( Efficiency.GetNbinsX() ):
-		for j in range( Efficiency.GetNbinsY() ):
-			if Efficiency.GetXaxis().GetBinLowEdge(i) == 400: print '400: ', round( Efficiency.GetBinContent( i, j ),2), '\pm', round( Efficiency.GetBinError( i , j), 4 )
-			if Efficiency.GetXaxis().GetBinLowEdge(i) == 500: print '500: ', round( Efficiency.GetBinContent( i, j ),2), '\pm', round( Efficiency.GetBinError( i , j), 4 )
-			if Efficiency.GetXaxis().GetBinLowEdge(i) == 550: print '550: ', round( Efficiency.GetBinContent( i, j ),2), '\pm', round( Efficiency.GetBinError( i , j), 4 )
-	'''
-	#Efficiency.SetTitle( ';'+xlabel+';'+ ylabel )
-	#eff = Efficiency.CreateHistogram()
 	
 	tdrStyle.SetPadRightMargin(0.12)
 	can = TCanvas('c1', 'c1',  10, 10, 1000, 750 )
@@ -265,10 +275,10 @@ def plot2DTriggerEfficiency( inFileSample, dataset, triggerSel, triggerDenom, na
 	#gPad.Update()
 	Efficiency.GetYaxis().SetTitleOffset(1.0)
 	Efficiency.SetMarkerSize(2)
-	Efficiency.GetXaxis().SetRange( int(Xmin/(10.*rebinx)), int(Xmax/(10.*rebinx)) )
+	Efficiency.GetXaxis().SetRange( int(Xmin/(rebinx)), int(Xmax/(rebinx)) )
 	Efficiency.GetXaxis().SetTitle( xlabel )
 	Efficiency.GetYaxis().SetTitle( ylabel )
-	Efficiency.GetYaxis().SetRange( int(Ymin/(10.*rebiny)), int(Ymax/(10.*rebiny)) )
+	Efficiency.GetYaxis().SetRange( int(Ymin/(rebiny)), int(Ymax/(rebiny)) )
 	#gPad.Update()
 
 	CMS_lumi.relPosX = 0.13
@@ -314,19 +324,19 @@ def plot2DTriggerEfficiency( inFileSample, dataset, triggerSel, triggerDenom, na
 #	return Efficiency
 
 
-def diffplotTriggerEfficiency( inFileSamples, triggerSel, name, cut, xmin, xmax, rebin, labX, labY, log, PU ):
+def diffplotTriggerEfficiency( inFileSamples, name, cut, xmin, xmax, rebin, labX, labY, log, PU ):
 	"""docstring for plot"""
 
-	outputFileName = name+'_'+cut+"_"+triggerSel+'_'+'_TriggerEfficiency'+args.version+'.'+args.extension
+	outputFileName = name+'_'+cut+"_"+args.trigger+'_'+'_TriggerEfficiency'+args.version+'.'+args.extension
 	print 'Processing.......', outputFileName
 
 	diffEffDenom = {}
 	diffEffPassing = {}
 	diffEff = {}
 	for sam in inFileSamples:
-		diffEffDenom[ sam ] = inFileSamples[ sam ].Get( 'TriggerEfficiency'+triggerSel+'/'+name+'Denom_'+cut ) #cutDijet' ) #+cut )
+		diffEffDenom[ sam ] = inFileSamples[ sam ].Get( 'TriggerEfficiency'+args.trigger+'/'+name+'Denom_'+cut ) #cutDijet' ) #+cut )
 		diffEffDenom[ sam ].Rebin(rebin)
-		diffEffPassing[ sam ] = inFileSamples[ sam ].Get( 'TriggerEfficiency'+triggerSel+'/'+name+'Passing_'+cut ) #cutHT' ) #+cut )
+		diffEffPassing[ sam ] = inFileSamples[ sam ].Get( 'TriggerEfficiency'+args.trigger+'/'+name+'Passing_'+cut ) #cutHT' ) #+cut )
 		diffEffPassing[ sam ].Rebin(rebin)
 		diffEff[ sam ] = TGraphAsymmErrors( diffEffPassing[sam], diffEffDenom[sam], 'cp'  )
 		#Efficiency = TEfficiency( Passing, Denom )
@@ -365,6 +375,63 @@ def diffplotTriggerEfficiency( inFileSamples, triggerSel, name, cut, xmin, xmax,
 	can1.SaveAs( 'Plots/'+outputFileName )
 	del can1
 
+def plot2D( inFile, sample, name, titleXAxis, titleXAxis2, Xmin, Xmax, rebinx, Ymin, Ymax, rebiny, legX, legY ):
+	"""docstring for plot"""
+
+	outputFileName = name+args.cut+'_'+args.trigger+'_'+sample+'_'+'TriggerEfficiency'+args.version+'.'+args.extension
+	print 'Processing.......', outputFileName
+	h1 = inFile.Get( args.trigger+'TriggerEfficiency/'+name+args.cut )
+	tmph1 = h1.Clone()
+	
+	### Rebinning
+	nbinsx = h1.GetXaxis().GetNbins()
+	nbinsy = h1.GetYaxis().GetNbins()
+	xmin  = h1.GetXaxis().GetXmin()
+	xmax  = h1.GetXaxis().GetXmax()
+	ymin  = h1.GetYaxis().GetXmin()
+	ymax  = h1.GetYaxis().GetXmax()
+	nx = nbinsx/rebinx
+	ny = nbinsy/rebiny
+	h1.SetBins( nx, xmin, xmax, ny, ymin, ymax )
+
+	for biny in range( 1, nbinsy):
+		for binx in range(1, nbinsx):
+			ibin1 = h1.GetBin(binx,biny)
+			h1.SetBinContent( ibin1, 0 )
+		
+	for biny in range( 1, nbinsy):
+		by = tmph1.GetYaxis().GetBinCenter( biny )
+		iy = h1.GetYaxis().FindBin(by)
+		for binx in range(1, nbinsx):
+			bx = tmph1.GetXaxis().GetBinCenter(binx)
+			ix  = h1.GetXaxis().FindBin(bx)
+			bin = tmph1.GetBin(binx,biny)
+			ibin= h1.GetBin(ix,iy)
+			cu  = tmph1.GetBinContent(bin)
+			h1.AddBinContent(ibin,cu)
+
+	h1.GetXaxis().SetTitle( titleXAxis )
+	h1.GetYaxis().SetTitleOffset( 1.0 )
+	h1.GetYaxis().SetTitle( titleXAxis2 )
+
+	if (Xmax or Ymax):
+		h1.GetXaxis().SetRangeUser( Xmin, Xmax )
+		h1.GetYaxis().SetRangeUser( Ymin, Ymax )
+
+	tdrStyle.SetPadRightMargin(0.12)
+	can = TCanvas('c1', 'c1',  750, 500 )
+	can.SetLogz()
+	#h1.SetMaximum(100)
+	#h1.SetMinimum(0.1)
+	h1.Draw('colz')
+
+	CMS_lumi.extraText = "Simulation Preliminary"
+	CMS_lumi.relPosX = 0.13
+	CMS_lumi.CMS_lumi(can, 4, 0)
+
+	can.SaveAs( 'Plots/'+outputFileName )
+	del can
+
 
 
 if __name__ == '__main__':
@@ -392,14 +459,12 @@ if __name__ == '__main__':
 
 	HTMinX = 300
 	HTMaxX = 1500
-	ptMinX = 100
-	ptMaxX = 800
 
 	plotList = [ 
 
 		[ '1D', 'HT', 500, 2000, 'HT [GeV]', 20, triggerlabX, triggerlabY, True],
 		#[ '1D', 'HT', 800, 1200, 1, triggerlabX, triggerlabY, True],
-		[ '1D', 'jet1Pt', ptMinX, ptMaxX, 'Leading Jet Pt [GeV]',  10, triggerlabX, triggerlabY, True],
+		[ '1D', 'jet1Pt', 300, 1000, 'Leading Jet Pt [GeV]',  10, triggerlabX, triggerlabY, True],
 #		[ '1D', 'jet2Pt', ptMinX, ptMaxX, 2, triggerlabX, triggerlabY, True],
 		[ '1D', 'jet1SoftDropMass', 0, 500, 'Leading Jet Softdrop Mass [GeV]', 10, triggerlabX, triggerlabY, True],
 		[ '1D', 'massAve', 0, 500, 10, triggerlabX, triggerlabY, True],
@@ -410,11 +475,15 @@ if __name__ == '__main__':
 		#[ '2D', 'jetMassHTDenom_triggerOne', 'Leading Trimmed Jet Mass [GeV]', 'H_{T} [GeV]', 0, 200, 2, 100, HTMaxX, 5, 0.85, 0.2],
 		#[ '2D', 'jetMassHTDenom_triggerTwo', 'Leading Trimmed Jet Mass [GeV]', 'H_{T} [GeV]', 0, 200, 2, 100, HTMaxX, 5, 0.85, 0.2],
 		#[ '2D', 'jetMassHTDenom_triggerOneAndTwo', 'Leading Trimmed Jet Mass [GeV]', 'H_{T} [GeV]', 0, 200, 2, 100, HTMaxX, 5, 0.85, 0.25],
+		[ '2d', 'jet1SDMassvsHT', 'Leading SD Jet Mass [GeV]', 'H_{T} [GeV]', 0, 200, 20, 900, 1500, 50, 0.85, 0.2],
+		[ '2d', 'jet1SDMassvsPt', 'Leading SD Jet Mass [GeV]', 'Leading Jet Pt [GeV]', 0, 200, 20, 400, 800, 50, 0.85, 0.2],
 
 
 		[ '2D', 'prunedMassAveHT', 'Leading Jet Pruned Mass [GeV]', 'HT [GeV]', 20, 200, 2, HTMinX, 1200, 10, jetMassHTlabX, jetMassHTlabY],
 		#[ '2D', 'jetMassHT', 20, 200, 2, HTMinX, 1200, 10, jetMassHTlabX, jetMassHTlabY],
 		[ '2D', 'jet4PtHT', '4th jet Pt [GeV]', 'HT [GeV]',  60, 300, 2, HTMinX, 1200, 10, jetMassHTlabX, jetMassHTlabY],
+		[ '2D', 'jet1SDMassvsHT', 'Leading SD Jet Mass [GeV]', 'H_{T} [GeV]', 20, 200, 20, 900, 1500, 50, 0.85, 0.2],
+		[ '2D', 'jet1SDMassvsPt', 'Leading SD Jet Mass [GeV]', 'Leading Jet Pt [GeV]', 20, 200, 20, 400, 800, 50, 0.85, 0.2],
 		]
 
 	if 'all' in args.single: Plots = [ x[1:] for x in plotList if x[0] in args.proc ]
@@ -428,24 +497,15 @@ if __name__ == '__main__':
 
 	Samples = {}
 
-	Samples[ 'SingleMuon2017' ] = [ 'TriggerValAndEff_SingleMuon-Run2017A.root', 0 ] 
-	Samples[ 'SingleMuonB' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016B_V2p4_'+args.version+'.root', 5928.83 ] 
-	Samples[ 'SingleMuonC' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016C_V2p4_'+args.version+'.root', 2632.18 ] 
-	Samples[ 'SingleMuonD' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016D_V2p4_'+args.version+'.root', 4344.64 ] 
-	Samples[ 'SingleMuonE' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016E_V2p4_'+args.version+'.root', 4117.09 ] 
-	Samples[ 'SingleMuonF' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016F_V2p4_'+args.version+'.root', 3185.97 ] 
-	Samples[ 'SingleMuonG' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016G_V2p4_'+args.version+'.root', 7721.06 ]
-	Samples[ 'SingleMuonH' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016H_V2p4_'+args.version+'.root', 8629.24 ] 
-	Samples[ 'SingleMuonAll' ] = [ 'RUNTriggerEfficiencies_SingleMuon_Run2016_V2p4_'+args.version+'.root', 35864. ] 
-
 	Samples[ 'JetHT2017' ] = [ 'TriggerValAndEff_JetHT-Run2017A.root', 0 ] 
-	Samples[ 'JetHTB' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016B_V2p1_'+args.version+'.root', 40.49 ] 
-	Samples[ 'JetHTC' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016C_V2p1_'+args.version+'.root', 2.13 ] 
-	Samples[ 'JetHTD' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016D_V2p1_'+args.version+'.root', 1.58 ] 
-	Samples[ 'JetHTE' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016E_V2p1_'+args.version+'.root', 1.84 ] 
-	Samples[ 'JetHTF' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016F_V2p1_'+args.version+'.root', 0.78 ] 
-	Samples[ 'JetHTG' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016G_V2p1_'+args.version+'.root', 0.982 ] 
-	Samples[ 'JetHTH' ] = [ 'RUNTriggerEfficiencies_JetHT_Run2016H_V2p1_'+args.version+'.root',  ] 
+	Samples[ 'RPV80' ] = [ 'RPVStopStopToJets_UDD312_M-80_TriggerEfficiencies_v04.root', 0 ] 
+	Samples[ 'TTJets' ] = [ 'TT_TriggerEfficiencies_v03.root', 0 ] 
+	Samples[ 'QCD' ] = [ 'QCD_Pt-15to3000_TriggerEfficiencies_v03.root', 0 ] 
+	#Samples[ 'SingleMuon2017A' ] = [ 'TriggerValAndEff_SingleMuon-Run2017A.root', 0 ] 
+	#Samples[ 'SingleMuon2017B' ] = [ 'TriggerEfficiencies_SingleMuon_Run2017B_v01.root', 4511 ] 
+	#Samples[ 'SingleMuon2017C' ] = [ 'TriggerEfficiencies_SingleMuon_Run2017C-PromptReco-v1_v01.root', 1284 ] 
+	Samples[ 'SingleMuon2017C' ] = [ 'TriggerEfficiencies_SingleMuon_Run2017C-PromptReco_v02.root', 2413 ] 
+	#Samples[ 'SingleMuon2017All' ] = [ 'TriggerEfficiencies_SingleMuon_Run2017All_v01.root', 5795 ] 
 
 
 	processingSamples = {}
@@ -459,9 +519,10 @@ if __name__ == '__main__':
 
 	for sam in processingSamples:
 
-		CMS_lumi.lumi_13TeV = str( round( (processingSamples[sam][1]/1000.), 1 ) )+" fb^{-1}"
+		CMS_lumi.lumi_13TeV = '' #str( round( (processingSamples[sam][1]/1000.), 1 ) )+" fb^{-1}"
 		if 'SingleMu' in sam: BASEDTrigger = 'IsoMu27'
 		elif 'JetHT' in sam: BASEDTrigger = 'PFJet40'
+		else: BASEDTrigger = ''
 
 		for i in Plots:
 			if '1D' in args.proc:
@@ -472,7 +533,10 @@ if __name__ == '__main__':
 			elif '2D' in args.proc:
 				plot2DTriggerEfficiency( TFile.Open('Rootfiles/'+processingSamples[sam][0]), 
 							sam, 
-							args.trigger, 
 							BASEDTrigger, 
-							i[0], args.cut, i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10], PU )
+							i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10] )
 
+			elif '2d' in args.proc: 
+				plot2D( TFile.Open('Rootfiles/'+processingSamples[sam][0]),
+						sam,
+						i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], i[8], i[9], i[10] )

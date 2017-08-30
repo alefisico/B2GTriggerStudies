@@ -9,7 +9,7 @@ sys.argv = oldargv
 # load FWLite C++ libraries
 ROOT.gSystem.Load("libFWCoreFWLite.so");
 ROOT.gSystem.Load("libDataFormatsFWLite.so");
-ROOT.AutoLibraryLoader.enable()
+ROOT.FWLiteEnabler.enable();
 
 # load FWlite python libraries
 from DataFormats.FWLite import Handle, Events
